@@ -1,0 +1,41 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "obsidian-mcp",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "ALLOWED_GITHUB_USERNAME": "Aventerica89",
+    "VAULT_REPO_OWNER": "Aventerica89",
+    "VAULT_REPO_NAME": "Obsidian-Claude",
+    "VAULT_REPO_BRANCH": "main",
+    "CHATGPT_MCP_FOLDER": "ChatGPT MCP",
+    "CHATGPT_MCP_SECTION": "ChatGPT MCP"
+  },
+  "migrations": [
+    {
+      "new_sqlite_classes": ["ObsidianMCP"],
+      "tag": "v1"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "ObsidianMCP",
+        "name": "MCP_OBJECT"
+      }
+    ]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "<ADD-KV-ID>"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  },
+  "dev": {
+    "port": 8788
+  }
+}
