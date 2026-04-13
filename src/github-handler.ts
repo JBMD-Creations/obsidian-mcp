@@ -157,11 +157,17 @@ app.get('/callback', async (c) => {
     user = await new Octokit({ auth: accessToken }).rest.users.getAuthenticated();
   } catch (error) {
     console.error('GET /callback GitHub user lookup error', error);
-    return c.text('Unable to retrieve GitHub user information.', 502);
+    return c.text('Unable to retrieve user information from GitHub.', 502);
   }
 
   const { allowedGithubUsername } = getVaultConfig(c.env);
-  if (user.data.login.toLowerCase() !== allowedGithubUsername.toLowerCase()) {
+  const normalizedAllowedGithubUsername = allowedGithubUsername.trim().toLowerCase();
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,37})$/i.test(normalizedAllowedGithubUsername)) {
+    return c.text('Invalid server configuration for allowed GitHub username.', 500);
+  }
+
+  const normalizedGithubLogin = user.data.login.trim().toLowerCase();
+  if (normalizedGithubLogin !== normalizedAllowedGithubUsername) {
     return c.text('That GitHub account is not allowed to use this MCP server.', 403);
   }
 
@@ -174,7 +180,7 @@ app.get('/callback', async (c) => {
       props: {
         accessToken,
         login: user.data.login,
-        name: user.data.name,
+        name: user.data.name ?? user.data.login,
       } satisfies Props,
       request: oauthReqInfo,
       scope: oauthReqInfo.scope,
