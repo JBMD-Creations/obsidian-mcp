@@ -27,6 +27,17 @@ type RepoFile = {
   sha: string;
 };
 
+type GitHubRequestError = {
+  message?: string;
+  response?: {
+    data?: {
+      message?: string;
+    };
+    status?: number;
+  };
+  status?: number;
+};
+
 function toBase64(value: string) {
   return Buffer.from(value, 'utf8').toString('base64');
 }
@@ -35,30 +46,46 @@ function fromBase64(value: string) {
   return Buffer.from(value, 'base64').toString('utf8');
 }
 
+function formatGitHubError(error: unknown, action: string) {
+  const requestError = error as GitHubRequestError;
+  const status = requestError.response?.status ?? requestError.status;
+  const message = requestError.response?.data?.message ?? requestError.message ?? 'Unknown GitHub API error';
+  return new Error(`${action} failed${status ? ` (${status})` : ''}: ${message}`);
+}
+
 async function getTreeSha(octokit: Octokit, config: VaultConfig) {
-  const ref = await octokit.request('GET /repos/{owner}/{repo}/git/ref/heads/{ref}', {
-    owner: config.repoOwner,
-    repo: config.repoName,
-    ref: config.repoBranch,
-  });
+  try {
+    const ref = await octokit.request('GET /repos/{owner}/{repo}/git/ref/heads/{ref}', {
+      owner: config.repoOwner,
+      repo: config.repoName,
+      ref: config.repoBranch,
+    });
 
-  const commit = await octokit.request('GET /repos/{owner}/{repo}/git/commits/{commit_sha}', {
-    owner: config.repoOwner,
-    repo: config.repoName,
-    commit_sha: ref.data.object.sha,
-  });
+    const commit = await octokit.request('GET /repos/{owner}/{repo}/git/commits/{commit_sha}', {
+      owner: config.repoOwner,
+      repo: config.repoName,
+      commit_sha: ref.data.object.sha,
+    });
 
-  return commit.data.tree.sha;
+    return commit.data.tree.sha;
+  } catch (error) {
+    throw formatGitHubError(error, `Loading git tree for ${config.repoOwner}/${config.repoName}@${config.repoBranch}`);
+  }
 }
 
 async function listMarkdownPaths(octokit: Octokit, config: VaultConfig, folder?: string) {
   const treeSha = await getTreeSha(octokit, config);
-  const tree = await octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
-    owner: config.repoOwner,
-    repo: config.repoName,
-    tree_sha: treeSha,
-    recursive: '1',
-  });
+  let tree;
+  try {
+    tree = await octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
+      owner: config.repoOwner,
+      repo: config.repoName,
+      tree_sha: treeSha,
+      recursive: '1',
+    });
+  } catch (error) {
+    throw formatGitHubError(error, `Listing markdown paths in ${config.repoOwner}/${config.repoName}`);
+  }
 
   const prefix = folder ? `${assertAllowedMarkdownPath(`${folder}/placeholder.md`).replace(/\/placeholder\.md$/,'')}/` : '';
 
@@ -71,12 +98,17 @@ async function listMarkdownPaths(octokit: Octokit, config: VaultConfig, folder?:
 
 async function getFile(octokit: Octokit, config: VaultConfig, path: string): Promise<RepoFile> {
   const normalizedPath = assertAllowedMarkdownPath(path);
-  const response = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
-    owner: config.repoOwner,
-    repo: config.repoName,
-    path: normalizedPath,
-    ref: config.repoBranch,
-  });
+  let response;
+  try {
+    response = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+      owner: config.repoOwner,
+      repo: config.repoName,
+      path: normalizedPath,
+      ref: config.repoBranch,
+    });
+  } catch (error) {
+    throw formatGitHubError(error, `Loading note ${normalizedPath}`);
+  }
 
   if (Array.isArray(response.data) || !('content' in response.data) || !response.data.content) {
     throw new Error(`Could not load note at ${normalizedPath}`);
@@ -104,15 +136,19 @@ async function commitFile({
   path: string;
   sha?: string;
 }) {
-  await octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', {
-    owner: config.repoOwner,
-    repo: config.repoName,
-    path,
-    branch: config.repoBranch,
-    message,
-    content: toBase64(content),
-    sha,
-  });
+  try {
+    await octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', {
+      owner: config.repoOwner,
+      repo: config.repoName,
+      path,
+      branch: config.repoBranch,
+      message,
+      content: toBase64(content),
+      sha,
+    });
+  } catch (error) {
+    throw formatGitHubError(error, `Committing note ${path}`);
+  }
 }
 
 function scorePath(path: string, query: string) {
@@ -161,12 +197,16 @@ export async function searchNotes({
 
   const results: SearchResult[] = [];
   for (const entry of ranked) {
-    const file = await getFile(octokit, config, entry.path);
-    results.push({
-      path: file.path,
-      preview: buildPreview(file.content ?? ''),
-      title: extractTitle(file.content ?? '', file.path),
-    });
+    try {
+      const file = await getFile(octokit, config, entry.path);
+      results.push({
+        path: file.path,
+        preview: buildPreview(file.content ?? ''),
+        title: extractTitle(file.content ?? '', file.path),
+      });
+    } catch {
+      continue;
+    }
   }
 
   return results;
