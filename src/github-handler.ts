@@ -1,4 +1,3 @@
-import { env } from 'cloudflare:workers';
 import type { AuthRequest, OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import { Hono } from 'hono';
 import { Octokit } from 'octokit';
