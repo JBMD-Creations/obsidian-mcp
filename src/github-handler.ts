@@ -136,10 +136,15 @@ app.get('/callback', async (c) => {
     return c.text('Invalid OAuth request data', 400);
   }
 
+  const code = c.req.query('code');
+  if (!code) {
+    return c.text('Missing OAuth code', 400);
+  }
+
   const [accessToken, errResponse] = await fetchUpstreamAuthToken({
     client_id: c.env.GITHUB_CLIENT_ID,
     client_secret: c.env.GITHUB_CLIENT_SECRET,
-    code: c.req.query('code'),
+    code,
     redirect_uri: new URL('/callback', c.req.url).href,
     upstream_url: 'https://github.com/login/oauth/access_token',
   });
@@ -147,25 +152,39 @@ app.get('/callback', async (c) => {
     return errResponse;
   }
 
-  const user = await new Octokit({ auth: accessToken }).rest.users.getAuthenticated();
+  let user;
+  try {
+    user = await new Octokit({ auth: accessToken }).rest.users.getAuthenticated();
+  } catch (error) {
+    console.error('GET /callback GitHub user lookup error', error);
+    return c.text('Unable to retrieve GitHub user information.', 502);
+  }
+
   const { allowedGithubUsername } = getVaultConfig(c.env);
   if (user.data.login.toLowerCase() !== allowedGithubUsername.toLowerCase()) {
     return c.text('That GitHub account is not allowed to use this MCP server.', 403);
   }
 
-  const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
-    metadata: {
-      label: user.data.name ?? user.data.login,
-    },
-    props: {
-      accessToken,
-      login: user.data.login,
-      name: user.data.name,
-    } satisfies Props,
-    request: oauthReqInfo,
-    scope: oauthReqInfo.scope,
-    userId: user.data.login,
-  });
+  let redirectTo: string;
+  try {
+    const result = await c.env.OAUTH_PROVIDER.completeAuthorization({
+      metadata: {
+        label: user.data.name ?? user.data.login,
+      },
+      props: {
+        accessToken,
+        login: user.data.login,
+        name: user.data.name,
+      } satisfies Props,
+      request: oauthReqInfo,
+      scope: oauthReqInfo.scope,
+      userId: user.data.login,
+    });
+    redirectTo = result.redirectTo;
+  } catch (error) {
+    console.error('GET /callback completeAuthorization error', error);
+    return c.text('Unable to complete authorization.', 502);
+  }
 
   const headers = new Headers({ Location: redirectTo });
   if (clearSessionCookie) {
