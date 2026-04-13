@@ -51,6 +51,22 @@ wrangler kv namespace create "OAUTH_KV"
 
 Then copy the returned namespace id into [wrangler.jsonc](</Users/jb/repos/obsidian-mcp/wrangler.jsonc>).
 
+## GitHub Actions deploy
+
+The repo includes [deploy.yml](/Users/jb/repos/obsidian-mcp/.github/workflows/deploy.yml), which deploys on pushes to `main` and on manual dispatch.
+
+Set these GitHub repository secrets before enabling the workflow:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+
+The workflow uses `cloudflare/wrangler-action@v3.14.1` and runs:
+
+```bash
+npm ci
+wrangler deploy
+```
+
 ## GitHub OAuth app
 
 Create a GitHub OAuth App with:
