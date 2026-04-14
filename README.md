@@ -27,15 +27,24 @@ This is intentionally not a general-purpose filesystem MCP.
 - `create_chatgpt_note`
   - Create a new reviewable note only inside `ChatGPT MCP/`.
 - `list_allowed_destinations`
-  - Return the current write constraints and target repo details.
+  - Return the current write constraints, session status, and target repo details.
 - `list_session_groups`
   - List configured group → folder mappings for session commands.
 - `start_session`
-  - Set an active group/folder context for quick capture.
+  - Start a durable active session for the authenticated user and return a `session_id`.
 - `note`
-  - Append a note to the active session log.
+  - Append a note to the durable active session log (supports `content` or `text`).
 - `end_session`
-  - Append a final summary and clear active session context.
+  - Append a final summary and clear the durable active session context.
+
+## Session capture semantics
+
+- `start_session(group, folder_path?, title?)` starts a durable active session and returns `session_id`.
+- `note(content?, text?, related_notes?, session_id?)` appends to the active session log.
+- `end_session(summary?, related_notes?, session_id?)` appends a final summary and clears active session state.
+- `text` is accepted as an alias for `content`.
+- If `session_id` is omitted, the server uses the persisted active session for the authenticated user.
+- Active session state is persisted in KV (`OAUTH_KV`) and no longer depends on in-memory Worker state.
 
 ## Write semantics
 
