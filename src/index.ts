@@ -15,17 +15,12 @@ import {
   searchNotes,
 } from './github-vault';
 import { assertAllowedFolderPath, assertAllowedMarkdownPath, buildSessionLogPath } from './pathing';
+import { clearActiveSession, getActiveSession, saveActiveSession, type ActiveSessionRecord } from './session-store';
+import { normalizeNoteContent, resolveSessionId } from './session-tools';
 import type { Props } from './utils';
 
-type ActiveSession = {
-  folder: string;
-  group: string;
-  logPath: string;
-  startedAt: string;
-};
-
 type SessionState = {
-  activeSession: ActiveSession | null;
+  activeSession: ActiveSessionRecord | null;
 };
 
 function asText(data: unknown) {
@@ -88,7 +83,18 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
   async init() {
     const config = getVaultConfig(this.env);
     const octokit = new Octokit({ auth: this.props!.accessToken });
-    const startSession = async ({ folder_path, group }: { folder_path?: string; group: string }) => {
+
+    const loadActiveSession = async () => getActiveSession(this.env.OAUTH_KV, this.props!.login);
+
+    const startSession = async ({
+      folder_path,
+      group,
+      title,
+    }: {
+      folder_path?: string;
+      group: string;
+      title?: string;
+    }) => {
       const resolved = resolveSessionFolder({
         folderPath: folder_path,
         group,
@@ -101,26 +107,54 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
         limit: 20,
         octokit,
       });
-      const session: ActiveSession = {
+
+      const session: ActiveSessionRecord = {
         folder: resolved.folder,
         group: resolved.group,
         logPath: buildSessionLogPath({
           folder: config.sessionLogFolder,
           group: resolved.group,
         }),
+        sessionId: crypto.randomUUID(),
         startedAt: new Date().toISOString(),
+        title: title?.trim().length ? title.trim() : undefined,
       };
+
+      await saveActiveSession(this.env.OAUTH_KV, this.props!.login, session);
       this.setState({ activeSession: session });
+
       return asText({
         active_session: session,
         folder_summary: folderSummary,
+        usage: {
+          end: `end_session(summary: \"...\", session_id: \"${session.sessionId}\")`,
+          note: `note(text: \"...\", session_id: \"${session.sessionId}\")`,
+        },
       });
     };
-    const endSession = async ({ related_notes, summary }: { related_notes: string[]; summary?: string }) => {
-      const activeSession = this.state?.activeSession;
+
+    const endSession = async ({
+      related_notes,
+      session_id,
+      summary,
+    }: {
+      related_notes: string[];
+      session_id?: string;
+      summary?: string;
+    }) => {
+      const activeSession = await loadActiveSession();
       if (!activeSession) {
         throw new Error('No active session to close.');
       }
+
+      const resolvedSessionId = resolveSessionId({
+        session_id,
+        storedSessionId: activeSession.sessionId,
+      });
+      if (!resolvedSessionId || resolvedSessionId !== activeSession.sessionId) {
+        throw new Error('Session mismatch. Run start_session(group, folder_path?) again.');
+      }
+
       const finalSummary = summary?.trim().length ? summary.trim() : 'Session ended.';
       const result = await appendToSessionLog({
         config,
@@ -132,7 +166,10 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
         relatedNotes: related_notes,
         sessionEvent: 'end',
       });
+
+      await clearActiveSession(this.env.OAUTH_KV, this.props!.login);
       this.setState({ activeSession: null });
+
       return asText({
         closed_session: activeSession,
         updated_note: result,
@@ -143,8 +180,10 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
       'list_allowed_destinations',
       'Describe where ChatGPT is allowed to create notes and how appends are constrained.',
       {},
-      async () =>
-        asText({
+      async () => {
+        const activeSession = await loadActiveSession();
+
+        return asText({
           append: {
             footer_rule: `Append to any existing markdown note only under ## ${config.footerSection}.`,
             section_rule: `Append to any existing markdown note only under ## ${config.appendSection}.`,
@@ -153,30 +192,34 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
             folder: `${config.createFolder}/`,
           },
           sessions: {
-            active_session: this.state?.activeSession ?? null,
+            active_session: activeSession,
             folder_root: `${config.sessionFolderRoot}/`,
             log_folder: `${config.sessionLogFolder}/`,
             notes_section: config.sessionNotesSection,
-            start_command: 'start_session(group, folder_path?)',
-            note_command: 'note(content, related_notes?)',
-            end_command: 'end_session(summary?)',
+            start_command: 'start_session(group, folder_path?, title?)',
+            note_command: 'note(content?, text?, related_notes?, session_id?)',
+            end_command: 'end_session(summary?, related_notes?, session_id?)',
           },
           repo: `${config.repoOwner}/${config.repoName}`,
-        }),
+        });
+      },
     );
 
     this.server.tool(
       'list_session_groups',
       'List configured session groups and their repo folder mappings.',
       {},
-      async () =>
-        asText({
-          active_session: this.state?.activeSession ?? null,
+      async () => {
+        const activeSession = await loadActiveSession();
+
+        return asText({
+          active_session: activeSession,
           groups: Object.entries(config.sessionGroups)
             .sort(([left], [right]) => left.localeCompare(right))
             .map(([group, folder]) => ({ folder, group })),
           root: `${config.sessionFolderRoot}/`,
-        }),
+        });
+      },
     );
 
     this.server.tool(
@@ -185,6 +228,7 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
       {
         group: z.string().min(1),
         folder_path: z.string().min(1).optional(),
+        title: z.string().min(1).optional(),
       },
       startSession,
     );
@@ -195,6 +239,7 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
       {
         group: z.string().min(1),
         folder_path: z.string().min(1).optional(),
+        title: z.string().min(1).optional(),
       },
       startSession,
     );
@@ -203,17 +248,30 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
       'note',
       'Append a session note to the active session log note created per project group.',
       {
-        content: z.string().min(1),
+        content: z.string().min(1).optional(),
+        text: z.string().min(1).optional(),
         related_notes: z.array(z.string()).optional().default([]),
+        session_id: z.string().optional(),
       },
-      async ({ content, related_notes }) => {
-        const activeSession = this.state?.activeSession;
+      async ({ content, related_notes, session_id, text }) => {
+        const activeSession = await loadActiveSession();
         if (!activeSession) {
           throw new Error('No active session. Run start_session(group, folder_path?) first.');
         }
+
+        const resolvedSessionId = resolveSessionId({
+          session_id,
+          storedSessionId: activeSession.sessionId,
+        });
+        if (!resolvedSessionId || resolvedSessionId !== activeSession.sessionId) {
+          throw new Error('Session mismatch. Run start_session(group, folder_path?) again.');
+        }
+
+        const normalizedContent = normalizeNoteContent({ content, text });
+
         const result = await appendToSessionLog({
           config,
-          content,
+          content: normalizedContent,
           folder: activeSession.folder,
           group: activeSession.group,
           login: this.props!.login,
@@ -221,6 +279,7 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
           relatedNotes: related_notes,
           sessionEvent: 'note',
         });
+
         return asText({
           active_session: activeSession,
           updated_note: result,
@@ -234,6 +293,7 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
       {
         summary: z.string().optional(),
         related_notes: z.array(z.string()).optional().default([]),
+        session_id: z.string().optional(),
       },
       endSession,
     );
@@ -244,6 +304,7 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
       {
         summary: z.string().optional(),
         related_notes: z.array(z.string()).optional().default([]),
+        session_id: z.string().optional(),
       },
       endSession,
     );
