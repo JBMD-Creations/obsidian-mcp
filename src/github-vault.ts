@@ -39,6 +39,10 @@ type GitHubRequestError = {
   status?: number;
 };
 
+type GitHubStatusError = Error & {
+  status?: number;
+};
+
 function toBase64(value: string) {
   return Buffer.from(value, 'utf8').toString('base64');
 }
@@ -51,7 +55,11 @@ function formatGitHubError(error: unknown, action: string) {
   const requestError = error as GitHubRequestError;
   const status = requestError.response?.status ?? requestError.status;
   const message = requestError.response?.data?.message ?? requestError.message ?? 'Unknown GitHub API error';
-  return new Error(`${action} failed${status ? ` (${status})` : ''}: ${message}`);
+  const wrapped = new Error(`${action} failed${status ? ` (${status})` : ''}: ${message}`) as GitHubStatusError;
+  if (status) {
+    wrapped.status = status;
+  }
+  return wrapped;
 }
 
 function getErrorStatus(error: unknown) {
@@ -397,6 +405,7 @@ export async function appendToSessionLog({
     }
   }
 
+  const now = new Date();
   const eventContent = [
     `- session_event: ${sessionEvent}`,
     `- session_group: ${group}`,
@@ -408,13 +417,13 @@ export async function appendToSessionLog({
   const block = buildAppendBlock({
     content: eventContent,
     login,
-    now: new Date(),
+    now,
     relatedNotes,
   });
 
   if (!file) {
     const seededNote = buildSessionLogNote({
-      createdAt: new Date(),
+      createdAt: now,
       folder: normalizedFolder,
       group,
       login,

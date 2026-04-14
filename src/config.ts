@@ -50,7 +50,7 @@ function parseSessionGroups(value: string | undefined) {
     throw new Error('Invalid CHATGPT_MCP_SESSION_GROUPS JSON: expected an object map of group->folder.');
   }
 
-  const groups = { ...DEFAULT_SESSION_GROUPS };
+  const groups: Record<string, string> = {};
   for (const [key, folder] of Object.entries(parsed)) {
     if (!key || typeof folder !== 'string' || folder.trim().length === 0) {
       throw new Error(`Invalid CHATGPT_MCP_SESSION_GROUPS entry for "${key}".`);

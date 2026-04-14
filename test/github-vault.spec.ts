@@ -47,6 +47,66 @@ describe('getNote', () => {
   });
 });
 
+
+describe('appendToSessionLog', () => {
+  it('creates a group log note if one does not exist', async () => {
+    const octokit = createOctokitMock();
+    octokit.request
+      .mockRejectedValueOnce({
+        response: { data: { message: 'Not Found' }, status: 404 },
+      })
+      .mockResolvedValueOnce({
+        data: { content: { sha: 'new-sha' } },
+      });
+
+    const result = await appendToSessionLog({
+      config,
+      content: 'Captured an idea',
+      folder: 'John Notes/App Dev/VaporForge',
+      group: 'vaporforge',
+      login: 'Aventerica89',
+      octokit: octokit as never,
+      relatedNotes: [],
+      sessionEvent: 'note',
+    });
+
+    expect(result.path).toBe('ChatGPT MCP/Session Logs/vaporforge-session-log.md');
+    const commitCall = octokit.request.mock.calls[1];
+    expect(commitCall?.[1]?.path).toBe('ChatGPT MCP/Session Logs/vaporforge-session-log.md');
+    const committedMarkdown = Buffer.from(commitCall?.[1]?.content, 'base64').toString('utf8');
+    expect(committedMarkdown).toContain('## Session Notes');
+    expect(committedMarkdown).toContain('session_event: note');
+  });
+
+  it('treats wrapped 404 errors as missing logs by reading attached status metadata', async () => {
+    const octokit = createOctokitMock();
+    const wrapped404 = new Error(
+      'Loading note ChatGPT MCP/Session Logs/vaporforge-session-log.md failed (404): Not Found',
+    ) as Error & { status?: number };
+    wrapped404.status = 404;
+    octokit.request.mockReset();
+    octokit.request
+      .mockRejectedValueOnce(wrapped404)
+      .mockResolvedValueOnce({
+        data: { content: { sha: 'new-sha' } },
+      });
+
+    const result = await appendToSessionLog({
+      config,
+      content: 'Recovered from wrapped 404',
+      folder: 'John Notes/App Dev/VaporForge',
+      group: 'vaporforge',
+      login: 'Aventerica89',
+      octokit: octokit as never,
+      relatedNotes: [],
+      sessionEvent: 'note',
+    });
+
+    expect(result.path).toBe('ChatGPT MCP/Session Logs/vaporforge-session-log.md');
+    expect(octokit.request).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('searchNotes', () => {
   it('skips unreadable files instead of failing the whole search', async () => {
     const octokit = createOctokitMock();
@@ -157,36 +217,5 @@ describe('appendFooterNote', () => {
     const commitCall = octokit.request.mock.calls[1];
     expect(commitCall?.[1]?.path).toBe('Taxes/2026/Q1/Quarterly Tax Review.md');
     expect(Buffer.from(commitCall?.[1]?.content, 'base64').toString('utf8')).toContain('## ChatGPT MCP Footer');
-  });
-});
-
-describe('appendToSessionLog', () => {
-  it('creates a group log note if one does not exist', async () => {
-    const octokit = createOctokitMock();
-    octokit.request
-      .mockRejectedValueOnce({
-        response: { data: { message: 'Not Found' }, status: 404 },
-      })
-      .mockResolvedValueOnce({
-        data: { content: { sha: 'new-sha' } },
-      });
-
-    const result = await appendToSessionLog({
-      config,
-      content: 'Captured an idea',
-      folder: 'John Notes/App Dev/VaporForge',
-      group: 'vaporforge',
-      login: 'Aventerica89',
-      octokit: octokit as never,
-      relatedNotes: [],
-      sessionEvent: 'note',
-    });
-
-    expect(result.path).toBe('ChatGPT MCP/Session Logs/vaporforge-session-log.md');
-    const commitCall = octokit.request.mock.calls[1];
-    expect(commitCall?.[1]?.path).toBe('ChatGPT MCP/Session Logs/vaporforge-session-log.md');
-    const committedMarkdown = Buffer.from(commitCall?.[1]?.content, 'base64').toString('utf8');
-    expect(committedMarkdown).toContain('## Session Notes');
-    expect(committedMarkdown).toContain('session_event: note');
   });
 });
