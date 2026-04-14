@@ -5,9 +5,10 @@ import {
   buildAppendBlock,
   buildCreatedNote,
   buildPreview,
+  buildSessionLogNote,
   extractTitle,
 } from './markdown';
-import { assertAllowedMarkdownPath, buildCreatePath } from './pathing';
+import { assertAllowedFolderPath, assertAllowedMarkdownPath, buildCreatePath, buildSessionLogPath } from './pathing';
 
 export type SearchResult = {
   path: string;
@@ -51,6 +52,22 @@ function formatGitHubError(error: unknown, action: string) {
   const status = requestError.response?.status ?? requestError.status;
   const message = requestError.response?.data?.message ?? requestError.message ?? 'Unknown GitHub API error';
   return new Error(`${action} failed${status ? ` (${status})` : ''}: ${message}`);
+}
+
+function getErrorStatus(error: unknown) {
+  const requestError = error as GitHubRequestError;
+  if (requestError.response?.status) {
+    return requestError.response.status;
+  }
+  if (requestError.status) {
+    return requestError.status;
+  }
+  const message = error instanceof Error ? error.message : '';
+  const match = message.match(/\((\d{3})\):/);
+  if (!match) {
+    return undefined;
+  }
+  return Number(match[1]);
 }
 
 async function getTreeSha(octokit: Octokit, config: VaultConfig) {
@@ -212,6 +229,26 @@ export async function searchNotes({
   return results;
 }
 
+export async function listNotesInFolder({
+  config,
+  folder,
+  limit = 30,
+  octokit,
+}: {
+  config: VaultConfig;
+  folder: string;
+  limit?: number;
+  octokit: Octokit;
+}) {
+  const normalizedFolder = assertAllowedFolderPath(folder);
+  const paths = await listMarkdownPaths(octokit, config, normalizedFolder);
+  return {
+    folder: normalizedFolder,
+    note_count: paths.length,
+    sample_paths: paths.slice(0, Math.max(limit, 1)),
+  };
+}
+
 export async function getNote({
   config,
   octokit,
@@ -226,6 +263,50 @@ export async function getNote({
     content: file.content ?? '',
     path: file.path,
     title: extractTitle(file.content ?? '', file.path),
+  };
+}
+
+async function appendToSection({
+  config,
+  content,
+  login,
+  octokit,
+  path,
+  relatedNotes,
+  sectionHeading,
+}: {
+  config: VaultConfig;
+  content: string;
+  login: string;
+  octokit: Octokit;
+  path: string;
+  relatedNotes: string[];
+  sectionHeading: string;
+}) {
+  const file = await getFile(octokit, config, path);
+  const nextContent = appendUnderSection({
+    block: buildAppendBlock({
+      content,
+      login,
+      now: new Date(),
+      relatedNotes,
+    }),
+    markdown: file.content ?? '',
+    sectionHeading,
+  });
+
+  await commitFile({
+    config,
+    content: nextContent,
+    message: `obsidian-mcp: append to ${file.path}`,
+    octokit,
+    path: file.path,
+    sha: file.sha,
+  });
+
+  return {
+    path: file.path,
+    title: extractTitle(nextContent, file.path),
   };
 }
 
@@ -244,30 +325,139 @@ export async function appendToNote({
   path: string;
   relatedNotes: string[];
 }) {
-  const file = await getFile(octokit, config, path);
-  const nextContent = appendUnderSection({
-    block: buildAppendBlock({
-      content,
-      login,
-      now: new Date(),
-      relatedNotes,
-    }),
-    markdown: file.content ?? '',
+  return appendToSection({
+    config,
+    content,
+    login,
+    octokit,
+    path,
+    relatedNotes,
     sectionHeading: config.appendSection,
+  });
+}
+
+export async function appendFooterNote({
+  config,
+  content,
+  login,
+  octokit,
+  path,
+  relatedNotes,
+}: {
+  config: VaultConfig;
+  content: string;
+  login: string;
+  octokit: Octokit;
+  path: string;
+  relatedNotes: string[];
+}) {
+  return appendToSection({
+    config,
+    content,
+    login,
+    octokit,
+    path,
+    relatedNotes,
+    sectionHeading: config.footerSection,
+  });
+}
+
+export async function appendToSessionLog({
+  config,
+  content,
+  folder,
+  group,
+  login,
+  octokit,
+  relatedNotes,
+  sessionEvent,
+}: {
+  config: VaultConfig;
+  content: string;
+  folder: string;
+  group: string;
+  login: string;
+  octokit: Octokit;
+  relatedNotes: string[];
+  sessionEvent: 'note' | 'end';
+}) {
+  const normalizedFolder = assertAllowedFolderPath(folder);
+  const logPath = buildSessionLogPath({
+    folder: config.sessionLogFolder,
+    group,
+  });
+
+  let file = null as RepoFile | null;
+  try {
+    file = await getFile(octokit, config, logPath);
+  } catch (error) {
+    const status = getErrorStatus(error);
+    if (status !== 404) {
+      throw error;
+    }
+  }
+
+  const eventContent = [
+    `- session_event: ${sessionEvent}`,
+    `- session_group: ${group}`,
+    `- session_folder: ${normalizedFolder}`,
+    '',
+    content.trim(),
+  ].join('\n');
+
+  const block = buildAppendBlock({
+    content: eventContent,
+    login,
+    now: new Date(),
+    relatedNotes,
+  });
+
+  if (!file) {
+    const seededNote = buildSessionLogNote({
+      createdAt: new Date(),
+      folder: normalizedFolder,
+      group,
+      login,
+      sectionHeading: config.sessionNotesSection,
+    });
+    const nextContent = appendUnderSection({
+      block,
+      markdown: seededNote,
+      sectionHeading: config.sessionNotesSection,
+    });
+
+    await commitFile({
+      config,
+      content: nextContent,
+      message: `obsidian-mcp: create session log ${logPath}`,
+      octokit,
+      path: logPath,
+    });
+
+    return {
+      path: logPath,
+      title: extractTitle(nextContent, logPath),
+    };
+  }
+
+  const nextContent = appendUnderSection({
+    block,
+    markdown: file.content ?? '',
+    sectionHeading: config.sessionNotesSection,
   });
 
   await commitFile({
     config,
     content: nextContent,
-    message: `obsidian-mcp: append to ${file.path}`,
+    message: `obsidian-mcp: append session log ${logPath}`,
     octokit,
-    path: file.path,
+    path: logPath,
     sha: file.sha,
   });
 
   return {
-    path: file.path,
-    title: extractTitle(nextContent, file.path),
+    path: logPath,
+    title: extractTitle(nextContent, logPath),
   };
 }
 

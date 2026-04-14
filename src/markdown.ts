@@ -136,3 +136,45 @@ export function buildCreatedNote({
 
   return `${frontmatter.join('\n')}# ${title}\n\n${body.trim()}\n`;
 }
+
+export function buildSessionLogNote({
+  createdAt,
+  folder,
+  group,
+  login,
+  sectionHeading,
+}: {
+  createdAt: Date;
+  folder: string;
+  group: string;
+  login: string;
+  sectionHeading: string;
+}) {
+  const title = `${group} Session Log`;
+  const frontmatter = [
+    '---',
+    `title: ${quoteYaml(title)}`,
+    'created_by: chatgpt-mcp',
+    `created_at: ${createdAt.toISOString()}`,
+    `actor: ${quoteYaml(login)}`,
+    `session_group: ${quoteYaml(group)}`,
+    `session_folder: ${quoteYaml(folder)}`,
+    'needs_review: true',
+    'tags:',
+    `  - ${quoteYaml('chatgpt-mcp')}`,
+    `  - ${quoteYaml('session-log')}`,
+    `  - ${quoteYaml(group.toLowerCase())}`,
+    '---',
+    '',
+  ];
+
+  return [
+    ...frontmatter,
+    `# ${title}`,
+    '',
+    `- Session scope folder: \`${folder}\``,
+    '',
+    `## ${sectionHeading}`,
+    '',
+  ].join('\n');
+}

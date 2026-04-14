@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { assertAllowedMarkdownPath, buildCreatePath, slugifyTitle } from '../src/pathing';
+import {
+  assertAllowedFolderPath,
+  assertAllowedMarkdownPath,
+  buildCreatePath,
+  buildSessionLogPath,
+  slugifyTitle,
+} from '../src/pathing';
 
 describe('assertAllowedMarkdownPath', () => {
   it('accepts normal markdown paths', () => {
@@ -29,5 +35,24 @@ describe('buildCreatePath', () => {
 
   it('slugifies titles predictably', () => {
     expect(slugifyTitle('  Tax Verification Update  ')).toBe('tax-verification-update');
+  });
+});
+
+describe('assertAllowedFolderPath', () => {
+  it('accepts normal folder paths', () => {
+    expect(assertAllowedFolderPath('John Notes/App Dev/VaporForge')).toBe('John Notes/App Dev/VaporForge');
+  });
+
+  it('rejects traversal and hidden folders', () => {
+    expect(() => assertAllowedFolderPath('../etc')).toThrow();
+    expect(() => assertAllowedFolderPath('.obsidian/plugins')).toThrow();
+  });
+});
+
+describe('buildSessionLogPath', () => {
+  it('builds a deterministic group log path', () => {
+    expect(buildSessionLogPath({ folder: 'ChatGPT MCP/Session Logs', group: 'VaporForge' })).toBe(
+      'ChatGPT MCP/Session Logs/vaporforge-session-log.md',
+    );
   });
 });

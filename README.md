@@ -7,7 +7,9 @@ Remote MCP server for safe ChatGPT-driven note capture into the `Aventerica89/Ob
 - Search markdown notes in the vault repo.
 - Read a note by path.
 - Append structured blocks to existing notes, only under `## ChatGPT MCP`.
+- Append structured footer blocks to existing notes, only under `## ChatGPT MCP Footer`.
 - Create new notes only inside `ChatGPT MCP/`.
+- Start scoped project sessions (`start_session`) and capture quick notes (`note` / `end_session`) into one session-log note per group.
 - Auto-commit each write directly to the vault repo.
 
 This is intentionally not a general-purpose filesystem MCP.
@@ -20,18 +22,40 @@ This is intentionally not a general-purpose filesystem MCP.
   - Read an existing markdown note from the vault repo.
 - `append_to_note`
   - Append a structured block to an existing note, only under `## ChatGPT MCP`.
+- `append_footer_note`
+  - Append a structured block to any existing note, only under `## ChatGPT MCP Footer`.
 - `create_chatgpt_note`
   - Create a new reviewable note only inside `ChatGPT MCP/`.
 - `list_allowed_destinations`
   - Return the current write constraints and target repo details.
+- `list_session_groups`
+  - List configured group → folder mappings for session commands.
+- `start_session`
+  - Set an active group/folder context for quick capture.
+- `note`
+  - Append a note to the active session log.
+- `end_session`
+  - Append a final summary and clear active session context.
 
 ## Write semantics
 
 - Existing notes are never overwritten in place outside the reserved section.
 - If `## ChatGPT MCP` does not exist, it is created at the end of the note.
 - Every append block includes timestamp, `source: chatgpt-mcp`, `actor`, and `needs_review: true`.
+- Session captures append to `ChatGPT MCP/Session Logs/<group>-session-log.md`.
 - New notes are created only under `ChatGPT MCP/` with reviewable frontmatter.
 - Every successful write creates a direct commit in the vault repo.
+
+## Optional environment variables
+
+These are optional; defaults are applied when unset.
+
+- `CHATGPT_MCP_FOOTER_SECTION` (default: `ChatGPT MCP Footer`)
+- `CHATGPT_MCP_SESSION_FOLDER_ROOT` (default: `John Notes/App Dev`)
+- `CHATGPT_MCP_SESSION_LOG_FOLDER` (default: `ChatGPT MCP/Session Logs`)
+- `CHATGPT_MCP_SESSION_NOTES_SECTION` (default: `Session Notes`)
+- `CHATGPT_MCP_SESSION_GROUPS` JSON map of lowercase group names to folders  
+  Example: `{"vaporforge":"John Notes/App Dev/VaporForge","agency-ops":"John Notes/App Dev/Agency Ops"}`
 
 ## Required secrets
 
@@ -114,6 +138,7 @@ After deploy, register the remote MCP endpoint in ChatGPT using:
 
 - Only the GitHub username in `ALLOWED_GITHUB_USERNAME` can authorize.
 - Existing notes can only be appended under `## ChatGPT MCP`.
+- Footer appends can only be written under `## ChatGPT MCP Footer`.
 - New notes can only be created in `ChatGPT MCP/`.
 - No overwrite, rename, move, or delete tools are exposed.
 - Hidden paths, `.obsidian`, `.git`, path traversal, and non-Markdown targets are rejected.

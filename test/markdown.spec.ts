@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appendUnderSection, buildAppendBlock, extractTitle } from '../src/markdown';
+import { appendUnderSection, buildAppendBlock, buildSessionLogNote, extractTitle } from '../src/markdown';
 
 describe('extractTitle', () => {
   it('prefers frontmatter title', () => {
@@ -38,5 +38,21 @@ describe('appendUnderSection', () => {
     });
 
     expect(appended.indexOf('Added context')).toBeLessThan(appended.indexOf('## Next Section'));
+  });
+});
+
+describe('buildSessionLogNote', () => {
+  it('creates a session log shell with notes section', () => {
+    const markdown = buildSessionLogNote({
+      createdAt: new Date('2026-04-14T00:00:00.000Z'),
+      folder: 'John Notes/App Dev/VaporForge',
+      group: 'vaporforge',
+      login: 'Aventerica89',
+      sectionHeading: 'Session Notes',
+    });
+
+    expect(markdown).toContain("title: 'vaporforge Session Log'");
+    expect(markdown).toContain("session_folder: 'John Notes/App Dev/VaporForge'");
+    expect(markdown).toContain('## Session Notes');
   });
 });
