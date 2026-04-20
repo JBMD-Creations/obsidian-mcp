@@ -90,7 +90,7 @@ Then copy the returned namespace id into [wrangler.jsonc](./wrangler.jsonc).
 
 ## GitHub Actions deploy
 
-The repo includes [deploy.yml](./.github/workflows/deploy.yml), which deploys on pushes to `main` and on manual dispatch.
+The repo includes [deploy.yml](./.github/workflows/deploy.yml), which deploys on manual dispatch and on pushes of version tags (`v*`).
 
 Set these GitHub repository secrets before enabling the workflow:
 
