@@ -12,7 +12,7 @@
     "CHATGPT_MCP_FOLDER": "ChatGPT MCP",
     "CHATGPT_MCP_SECTION": "ChatGPT MCP",
     "CHATGPT_MCP_SESSION_FOLDER_ROOT": "John Notes/App Dev",
-    "CHATGPT_MCP_SESSION_GROUPS": "{\"agency-ops\":\"John Notes/App Dev/Agency Ops\",\"vaporforge\":\"John Notes/App Dev/VaporForge\"}"
+    "CHATGPT_MCP_SESSION_GROUPS": "{\"agency-ops\":\"John Notes/App Dev/Agency Ops\",\"app-cloud-panel\":\"John Notes/App Dev/App Cloud Panel\",\"clarity\":\"John Notes/App Dev/Clarity\",\"cross-app\":\"John Notes/App Dev/Cross App\",\"flos-sports-bar\":\"John Notes/App Dev/Flos Sports Bar\",\"jb-ops\":\"John Notes/App Dev/JB Ops\",\"local-claude-manager\":\"John Notes/App Dev/Local Claude Manager\",\"obsidian-mcp\":\"John Notes/App Dev/Obsidian MCP\",\"plugins-skills-commands\":\"John Notes/App Dev/Plugins Skills Commands\",\"travel-nurse\":\"John Notes/App Dev/Travel Nurse\",\"urls-to-go\":\"John Notes/App Dev/URLs to Go\",\"vaporforge\":\"John Notes/App Dev/VaporForge\",\"vaporops\":\"John Notes/App Dev/VaporOps\",\"wp-dispatch\":\"John Notes/App Dev/WP Dispatch\"}"
   },
   "migrations": [
     {
