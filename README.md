@@ -16,8 +16,12 @@ This is intentionally not a general-purpose filesystem MCP.
 
 ## Tool surface
 
+- `search`
+  - ChatGPT connector compatibility tool. Takes `query`, returns `{ results: [{ id, title, url }] }`. `id` is a vault-relative markdown path suitable for `fetch`.
+- `fetch`
+  - ChatGPT connector compatibility tool. Takes the `id` returned by `search` and returns `{ id, title, text, url, metadata }` with the full note body.
 - `search_notes`
-  - Find likely markdown notes by title/path and return a short preview.
+  - Find likely markdown notes by title/path and return a short preview. Supports an optional `folder` scope; intended for Claude and other clients that can pass richer arguments.
 - `get_note`
   - Read an existing markdown note from the vault repo.
 - `append_to_note`
@@ -140,6 +144,13 @@ npm test
 
 After deploy, register the remote MCP endpoint in ChatGPT using:
 
+- MCP Server URL (preferred, SSE transport): `https://obsidian-mcp.<your-subdomain>.workers.dev/sse`
+- Authentication: OAuth
+
+ChatGPT's connector ("Apps") validates that `search` and `fetch` tools exist before it will operate; this server exposes both with the OpenAI-compatible schema.
+
+## Claude and other streamable-HTTP clients
+
 - MCP Server URL: `https://obsidian-mcp.<your-subdomain>.workers.dev/mcp`
 - Authentication: OAuth
 
@@ -151,3 +162,4 @@ After deploy, register the remote MCP endpoint in ChatGPT using:
 - New notes can only be created in `ChatGPT MCP/`.
 - No overwrite, rename, move, or delete tools are exposed.
 - Hidden paths, `.obsidian`, `.git`, path traversal, and non-Markdown targets are rejected.
+- `fetch(id)` revalidates `id` via `assertAllowedMarkdownPath`, so ChatGPT cannot craft an id that escapes the vault.

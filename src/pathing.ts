@@ -88,3 +88,24 @@ export function buildSessionLogPath({ folder, group }: { folder: string; group: 
   const slug = slugifyTitle(group);
   return `${normalizedFolder}/${slug}-session-log.md`;
 }
+
+function encodePathSegments(value: string) {
+  return value.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+}
+
+export function buildGithubBlobUrl({
+  branch,
+  owner,
+  path,
+  repo,
+}: {
+  branch: string;
+  owner: string;
+  path: string;
+  repo: string;
+}) {
+  const normalizedPath = assertAllowedMarkdownPath(path);
+  const encodedBranch = encodePathSegments(branch);
+  const encodedPath = encodePathSegments(normalizedPath);
+  return `https://github.com/${owner}/${repo}/blob/${encodedBranch}/${encodedPath}`;
+}

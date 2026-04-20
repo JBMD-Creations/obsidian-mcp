@@ -14,7 +14,7 @@ import {
   listNotesInFolder,
   searchNotes,
 } from './github-vault';
-import { assertAllowedFolderPath, assertAllowedMarkdownPath, buildSessionLogPath } from './pathing';
+import { assertAllowedFolderPath, assertAllowedMarkdownPath, buildGithubBlobUrl, buildSessionLogPath } from './pathing';
 import { clearActiveSession, getActiveSession, saveActiveSession, type ActiveSessionRecord } from './session-store';
 import { normalizeNoteContent, resolveSessionId } from './session-tools';
 import type { Props } from './utils';
@@ -329,6 +329,57 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
     );
 
     this.server.tool(
+      'search',
+      'ChatGPT connector compatibility: search vault notes by query and return ids for fetch().',
+      {
+        query: z.string().min(1),
+      },
+      async ({ query }) => {
+        const matches = await searchNotes({ config, octokit, query });
+        const results = matches.map((result) => ({
+          id: result.path,
+          title: result.title,
+          url: buildGithubBlobUrl({
+            branch: config.repoBranch,
+            owner: config.repoOwner,
+            path: result.path,
+            repo: config.repoName,
+          }),
+        }));
+        return asText({ results });
+      },
+    );
+
+    this.server.tool(
+      'fetch',
+      'ChatGPT connector compatibility: fetch the full text of a vault note by id (from search()).',
+      {
+        id: z.string().min(1),
+      },
+      async ({ id }) => {
+        const path = assertAllowedMarkdownPath(id);
+        const note = await getNote({ config, octokit, path });
+        const url = buildGithubBlobUrl({
+          branch: config.repoBranch,
+          owner: config.repoOwner,
+          path: note.path,
+          repo: config.repoName,
+        });
+        return asText({
+          id: note.path,
+          title: note.title,
+          text: note.content,
+          url,
+          metadata: {
+            branch: config.repoBranch,
+            path: note.path,
+            repo: `${config.repoOwner}/${config.repoName}`,
+          },
+        });
+      },
+    );
+
+    this.server.tool(
       'append_to_note',
       'Append a structured block to an existing note under the ChatGPT MCP section.',
       {
@@ -396,8 +447,10 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
 }
 
 export default new OAuthProvider({
-  apiHandler: ObsidianMCP.serve('/mcp'),
-  apiRoute: '/mcp',
+  apiHandlers: {
+    '/mcp': ObsidianMCP.serve('/mcp'),
+    '/sse': ObsidianMCP.serveSSE('/sse'),
+  },
   authorizeEndpoint: '/authorize',
   clientRegistrationEndpoint: '/register',
   defaultHandler: GitHubHandler as never,
