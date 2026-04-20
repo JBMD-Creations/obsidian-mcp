@@ -1,3 +1,5 @@
+import { getVaultConfigOverrides, type VaultConfigOverrides } from './vault-config-store';
+
 export type VaultConfig = {
   allowedGithubUsername: string;
   appendSection: string;
@@ -11,6 +13,8 @@ export type VaultConfig = {
   sessionLogFolder: string;
   sessionNotesSection: string;
 };
+
+export type VaultConfigField = Exclude<keyof VaultConfig, 'allowedGithubUsername'>;
 
 const DEFAULT_FOOTER_SECTION = 'ChatGPT MCP Footer';
 const DEFAULT_SESSION_FOLDER_ROOT = 'Notes';
@@ -43,14 +47,18 @@ function parseSessionGroups(value: string | undefined) {
     );
   }
 
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error('Invalid CHATGPT_MCP_SESSION_GROUPS JSON: expected an object map of group->folder.');
+  return normalizeSessionGroups(parsed, 'CHATGPT_MCP_SESSION_GROUPS');
+}
+
+export function normalizeSessionGroups(value: unknown, label = 'session_groups') {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`Invalid ${label}: expected an object map of group->folder.`);
   }
 
   const groups: Record<string, string> = {};
-  for (const [key, folder] of Object.entries(parsed)) {
+  for (const [key, folder] of Object.entries(value as Record<string, unknown>)) {
     if (!key || typeof folder !== 'string' || folder.trim().length === 0) {
-      throw new Error(`Invalid CHATGPT_MCP_SESSION_GROUPS entry for "${key}".`);
+      throw new Error(`Invalid ${label} entry for "${key}".`);
     }
     groups[key.trim().toLowerCase()] = folder.trim();
   }
@@ -58,7 +66,7 @@ function parseSessionGroups(value: string | undefined) {
   return groups;
 }
 
-export function getVaultConfig(env: Env): VaultConfig {
+export function getVaultDefaults(env: Env): VaultConfig {
   const optional = env as unknown as Record<string, string | undefined>;
   return {
     allowedGithubUsername: requireEnv(env.ALLOWED_GITHUB_USERNAME, 'ALLOWED_GITHUB_USERNAME'),
@@ -73,4 +81,48 @@ export function getVaultConfig(env: Env): VaultConfig {
     sessionLogFolder: optionalEnv(optional.CHATGPT_MCP_SESSION_LOG_FOLDER, DEFAULT_SESSION_LOG_FOLDER),
     sessionNotesSection: optionalEnv(optional.CHATGPT_MCP_SESSION_NOTES_SECTION, DEFAULT_SESSION_NOTES_SECTION),
   };
+}
+
+export function applyOverrides(defaults: VaultConfig, overrides: VaultConfigOverrides | null): VaultConfig {
+  if (!overrides) {
+    return defaults;
+  }
+  return {
+    ...defaults,
+    ...overrides,
+    sessionGroups: overrides.sessionGroups ?? defaults.sessionGroups,
+  };
+}
+
+export async function loadVaultConfig({
+  env,
+  kv,
+  login,
+}: {
+  env: Env;
+  kv: KVNamespace;
+  login: string;
+}): Promise<VaultConfig> {
+  const defaults = getVaultDefaults(env);
+  const overrides = await getVaultConfigOverrides(kv, login);
+  return applyOverrides(defaults, overrides);
+}
+
+export function diffOverrides(defaults: VaultConfig, effective: VaultConfig): VaultConfigField[] {
+  const fields: VaultConfigField[] = [
+    'appendSection',
+    'createFolder',
+    'footerSection',
+    'repoBranch',
+    'repoName',
+    'repoOwner',
+    'sessionFolderRoot',
+    'sessionLogFolder',
+    'sessionNotesSection',
+  ];
+  const changed = fields.filter((field) => defaults[field] !== effective[field]);
+  if (JSON.stringify(defaults.sessionGroups) !== JSON.stringify(effective.sessionGroups)) {
+    changed.push('sessionGroups');
+  }
+  return changed;
 }

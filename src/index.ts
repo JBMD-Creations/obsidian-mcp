@@ -3,7 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { McpAgent } from 'agents/mcp';
 import { Octokit } from 'octokit';
 import { z } from 'zod';
-import { getVaultConfig } from './config';
+import { diffOverrides, getVaultDefaults, loadVaultConfig, normalizeSessionGroups, type VaultConfig } from './config';
 import { GitHubHandler } from './github-handler';
 import {
   appendFooterNote,
@@ -23,6 +23,12 @@ import {
 } from './pathing';
 import { clearActiveSession, getActiveSession, saveActiveSession, type ActiveSessionRecord } from './session-store';
 import { normalizeNoteContent, resolveSessionId } from './session-tools';
+import {
+  clearVaultConfigOverrides,
+  getVaultConfigOverrides,
+  saveVaultConfigOverrides,
+  type VaultConfigOverrides,
+} from './vault-config-store';
 import type { Props } from './utils';
 
 type SessionState = {
@@ -37,6 +43,22 @@ function asText(data: unknown) {
         text: JSON.stringify(data, null, 2),
       },
     ],
+  };
+}
+
+function describeVaultConfig(config: VaultConfig) {
+  return {
+    allowed_github_username: config.allowedGithubUsername,
+    append_section: config.appendSection,
+    create_folder: config.createFolder,
+    footer_section: config.footerSection,
+    repo_branch: config.repoBranch,
+    repo_name: config.repoName,
+    repo_owner: config.repoOwner,
+    session_folder_root: config.sessionFolderRoot,
+    session_groups: config.sessionGroups,
+    session_log_folder: config.sessionLogFolder,
+    session_notes_section: config.sessionNotesSection,
   };
 }
 
@@ -87,8 +109,14 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
   });
 
   async init() {
-    const config = getVaultConfig(this.env);
     const octokit = new Octokit({ auth: this.props!.accessToken });
+
+    const loadConfig = () =>
+      loadVaultConfig({
+        env: this.env,
+        kv: this.env.OAUTH_KV,
+        login: this.props!.login,
+      });
 
     const loadActiveSession = async () => getActiveSession(this.env.OAUTH_KV, this.props!.login);
 
@@ -101,6 +129,7 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
       group: string;
       title?: string;
     }) => {
+      const config = await loadConfig();
       const resolved = resolveSessionFolder({
         folderPath: folder_path,
         group,
@@ -148,6 +177,7 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
       session_id?: string;
       summary?: string;
     }) => {
+      const config = await loadConfig();
       const activeSession = await loadActiveSession();
       if (!activeSession) {
         throw new Error('No active session to close.');
@@ -187,6 +217,7 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
       'Describe where ChatGPT is allowed to create notes and how appends are constrained.',
       {},
       async () => {
+        const config = await loadConfig();
         const activeSession = await loadActiveSession();
 
         return asText({
@@ -216,6 +247,7 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
       'List configured session groups and their repo folder mappings.',
       {},
       async () => {
+        const config = await loadConfig();
         const activeSession = await loadActiveSession();
 
         return asText({
@@ -260,6 +292,7 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
         session_id: z.string().optional(),
       },
       async ({ content, related_notes, session_id, text }) => {
+        const config = await loadConfig();
         const activeSession = await loadActiveSession();
         if (!activeSession) {
           throw new Error('No active session. Run start_session(group, folder_path?) first.');
@@ -322,7 +355,10 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
         query: z.string().min(1),
         folder: z.string().optional(),
       },
-      async ({ folder, query }) => asText(await searchNotes({ config, folder, octokit, query })),
+      async ({ folder, query }) => {
+        const config = await loadConfig();
+        return asText(await searchNotes({ config, folder, octokit, query }));
+      },
     );
 
     this.server.tool(
@@ -331,7 +367,10 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
       {
         path: z.string().min(1),
       },
-      async ({ path }) => asText(await getNote({ config, octokit, path: assertAllowedMarkdownPath(path) })),
+      async ({ path }) => {
+        const config = await loadConfig();
+        return asText(await getNote({ config, octokit, path: assertAllowedMarkdownPath(path) }));
+      },
     );
 
     this.server.tool(
@@ -341,6 +380,7 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
         query: z.string().min(1),
       },
       async ({ query }) => {
+        const config = await loadConfig();
         const matches = await searchNotes({ config, octokit, query });
         const results = matches.map((result) => ({
           id: result.path,
@@ -363,6 +403,7 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
         id: z.string().min(1),
       },
       async ({ id }) => {
+        const config = await loadConfig();
         const path = assertAllowedMarkdownPath(id);
         const note = await getNote({ config, octokit, path });
         const url = buildGithubBlobUrl({
@@ -393,8 +434,9 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
         content: z.string().min(1),
         related_notes: z.array(z.string()).optional().default([]),
       },
-      async ({ content, path, related_notes }) =>
-        asText(
+      async ({ content, path, related_notes }) => {
+        const config = await loadConfig();
+        return asText(
           await appendToNote({
             config,
             content,
@@ -403,7 +445,8 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
             path,
             relatedNotes: related_notes,
           }),
-        ),
+        );
+      },
     );
 
     this.server.tool(
@@ -414,8 +457,9 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
         content: z.string().min(1),
         related_notes: z.array(z.string()).optional().default([]),
       },
-      async ({ content, path, related_notes }) =>
-        asText(
+      async ({ content, path, related_notes }) => {
+        const config = await loadConfig();
+        return asText(
           await appendFooterNote({
             config,
             content,
@@ -424,7 +468,8 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
             path,
             relatedNotes: related_notes,
           }),
-        ),
+        );
+      },
     );
 
     this.server.tool(
@@ -438,6 +483,7 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
         tags: z.array(z.string()).optional().default([]),
       },
       async ({ body, folder, related_notes, tags, title }) => {
+        const config = await loadConfig();
         const targetFolder = folder
           ? assertAllowedCreateLocation(folder, {
               createFolder: config.createFolder,
@@ -456,6 +502,79 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
             title,
           }),
         );
+      },
+    );
+
+    this.server.tool(
+      'get_vault_config',
+      'Return the current effective vault config plus which fields were overridden via set_vault_config.',
+      {},
+      async () => {
+        const defaults = getVaultDefaults(this.env);
+        const overrides = await getVaultConfigOverrides(this.env.OAUTH_KV, this.props!.login);
+        const effective = await loadConfig();
+        return asText({
+          effective: describeVaultConfig(effective),
+          defaults: describeVaultConfig(defaults),
+          overridden_fields: diffOverrides(defaults, effective),
+          has_overrides: Boolean(overrides),
+        });
+      },
+    );
+
+    this.server.tool(
+      'set_vault_config',
+      'Store per-user vault config overrides in KV. Any field omitted keeps its prior value. Changes take effect on the next tool call.',
+      {
+        repo_owner: z.string().min(1).optional(),
+        repo_name: z.string().min(1).optional(),
+        repo_branch: z.string().min(1).optional(),
+        create_folder: z.string().min(1).optional(),
+        append_section: z.string().min(1).optional(),
+        footer_section: z.string().min(1).optional(),
+        session_folder_root: z.string().min(1).optional(),
+        session_log_folder: z.string().min(1).optional(),
+        session_notes_section: z.string().min(1).optional(),
+        session_groups: z.record(z.string(), z.string()).optional(),
+      },
+      async (input) => {
+        const update: VaultConfigOverrides = {};
+        if (input.repo_owner) update.repoOwner = input.repo_owner.trim();
+        if (input.repo_name) update.repoName = input.repo_name.trim();
+        if (input.repo_branch) update.repoBranch = input.repo_branch.trim();
+        if (input.create_folder) update.createFolder = assertAllowedFolderPath(input.create_folder);
+        if (input.append_section) update.appendSection = input.append_section.trim();
+        if (input.footer_section) update.footerSection = input.footer_section.trim();
+        if (input.session_folder_root) update.sessionFolderRoot = assertAllowedFolderPath(input.session_folder_root);
+        if (input.session_log_folder) update.sessionLogFolder = assertAllowedFolderPath(input.session_log_folder);
+        if (input.session_notes_section) update.sessionNotesSection = input.session_notes_section.trim();
+        if (input.session_groups) update.sessionGroups = normalizeSessionGroups(input.session_groups, 'session_groups');
+
+        if (Object.keys(update).length === 0) {
+          throw new Error('No overrides supplied. Pass at least one field, or call reset_vault_config to clear.');
+        }
+
+        await saveVaultConfigOverrides(this.env.OAUTH_KV, this.props!.login, update);
+        const effective = await loadConfig();
+        const defaults = getVaultDefaults(this.env);
+        return asText({
+          effective: describeVaultConfig(effective),
+          overridden_fields: diffOverrides(defaults, effective),
+        });
+      },
+    );
+
+    this.server.tool(
+      'reset_vault_config',
+      'Delete the per-user vault config override record so the Worker env defaults apply again.',
+      {},
+      async () => {
+        await clearVaultConfigOverrides(this.env.OAUTH_KV, this.props!.login);
+        const effective = await loadConfig();
+        return asText({
+          cleared: true,
+          effective: describeVaultConfig(effective),
+        });
       },
     );
   }

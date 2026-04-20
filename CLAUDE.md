@@ -15,6 +15,12 @@
 
 Run both locally before pushing; CI will re-run them on the PR.
 
+## Runtime config
+
+- Vault settings (repo, folders, sections, session groups) are per-user in `OAUTH_KV` at key `vault:config:<login>`.
+- `wrangler.jsonc` env vars act as defaults; KV overrides win and take effect on the next tool call — no restart needed.
+- `ALLOWED_GITHUB_USERNAME` is the one setting that stays in env only; it is the OAuth allowlist gate and must not be user-overridable.
+
 ## Commit style
 
 - Prefix commits with `fix:`, `feat:`, `chore:`, `docs:`, `ci:`, `test:`, or `refactor:` to match the existing history.

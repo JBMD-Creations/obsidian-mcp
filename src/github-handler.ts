@@ -1,7 +1,7 @@
 import type { AuthRequest, OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import { Hono } from 'hono';
 import { Octokit } from 'octokit';
-import { getVaultConfig } from './config';
+import { getVaultDefaults } from './config';
 import { fetchUpstreamAuthToken, getUpstreamAuthorizeUrl, type Props } from './utils';
 import {
   addApprovedClient,
@@ -160,7 +160,7 @@ app.get('/callback', async (c) => {
     return c.text('Unable to retrieve user information from GitHub.', 502);
   }
 
-  const { allowedGithubUsername } = getVaultConfig(c.env);
+  const { allowedGithubUsername } = getVaultDefaults(c.env);
   const normalizedAllowedGithubUsername = allowedGithubUsername.trim().toLowerCase();
   if (!/^[a-z0-9](?:[a-z0-9-]{0,37})$/i.test(normalizedAllowedGithubUsername)) {
     return c.text('Invalid server configuration for allowed GitHub username.', 500);

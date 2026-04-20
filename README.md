@@ -1,6 +1,19 @@
 # Obsidian MCP
 
-Remote MCP server for safe ChatGPT-driven note capture into the `Aventerica89/Obsidian-Claude` vault repo.
+Remote MCP server for safe ChatGPT-driven note capture into a private Obsidian vault hosted on GitHub.
+
+## Deploy your own
+
+This Worker is designed to be self-hostable: fork the repo, deploy to your own Cloudflare account, and point it at your own vault. No code edits required per vault change — reconfigure at runtime from inside the MCP client.
+
+1. Fork this repo, then click **Deploy to Cloudflare**:
+   [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/jbmd-creations/obsidian-mcp)
+2. Create a GitHub OAuth App (see **GitHub OAuth app** below) and set its secrets on the Worker.
+3. In `wrangler.jsonc`, set `ALLOWED_GITHUB_USERNAME` to your GitHub login. (This is the one config that cannot be overridden at runtime — it is the auth gate.)
+4. Optional: set default `VAULT_REPO_OWNER`, `VAULT_REPO_NAME`, `VAULT_REPO_BRANCH`, `CHATGPT_MCP_FOLDER`, `CHATGPT_MCP_SECTION`, and session-related env vars to your vault defaults.
+5. Connect your MCP client to `/mcp` (streamable) or `/sse`, authorize via GitHub, then call `set_vault_config(...)` to override any per-user setting from chat.
+
+**Config precedence:** per-user KV overrides (via `set_vault_config`) > `wrangler.jsonc` env defaults. Overrides take effect on the next tool call — no restart or redeploy.
 
 ## MVP behavior
 
@@ -40,6 +53,12 @@ This is intentionally not a general-purpose filesystem MCP.
   - Append a note to the durable active session log (supports `content` or `text`).
 - `end_session`
   - Append a final summary and clear the durable active session context.
+- `get_vault_config`
+  - Return the current effective vault config plus which fields are overridden vs. env defaults.
+- `set_vault_config`
+  - Store per-user vault config overrides in KV. Any field omitted keeps its prior value. Changes take effect on the next tool call, without redeploying.
+- `reset_vault_config`
+  - Delete the per-user override record so the Worker env defaults apply again.
 
 ## Session capture semantics
 
