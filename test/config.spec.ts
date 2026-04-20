@@ -11,13 +11,10 @@ describe('getVaultConfig', () => {
     VAULT_REPO_OWNER: 'Aventerica89',
   } as Env;
 
-  it('uses default session groups when env is omitted', () => {
+  it('defaults session groups to an empty map when env is omitted', () => {
     const config = getVaultConfig(baseEnv);
 
-    expect(config.sessionGroups).toEqual({
-      'agency-ops': 'John Notes/App Dev/Agency Ops',
-      vaporforge: 'John Notes/App Dev/VaporForge',
-    });
+    expect(config.sessionGroups).toEqual({});
   });
 
   it('fully overrides default session groups when env is provided', () => {

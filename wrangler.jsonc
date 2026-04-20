@@ -10,7 +10,9 @@
     "VAULT_REPO_NAME": "Obsidian-Claude",
     "VAULT_REPO_BRANCH": "main",
     "CHATGPT_MCP_FOLDER": "ChatGPT MCP",
-    "CHATGPT_MCP_SECTION": "ChatGPT MCP"
+    "CHATGPT_MCP_SECTION": "ChatGPT MCP",
+    "CHATGPT_MCP_SESSION_FOLDER_ROOT": "John Notes/App Dev",
+    "CHATGPT_MCP_SESSION_GROUPS": "{\"agency-ops\":\"John Notes/App Dev/Agency Ops\",\"vaporforge\":\"John Notes/App Dev/VaporForge\"}"
   },
   "migrations": [
     {

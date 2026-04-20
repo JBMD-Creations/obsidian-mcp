@@ -64,11 +64,11 @@ This is intentionally not a general-purpose filesystem MCP.
 These are optional; defaults are applied when unset.
 
 - `CHATGPT_MCP_FOOTER_SECTION` (default: `ChatGPT MCP Footer`)
-- `CHATGPT_MCP_SESSION_FOLDER_ROOT` (default: `John Notes/App Dev`)
+- `CHATGPT_MCP_SESSION_FOLDER_ROOT` (default: `Notes`)
 - `CHATGPT_MCP_SESSION_LOG_FOLDER` (default: `ChatGPT MCP/Session Logs`)
 - `CHATGPT_MCP_SESSION_NOTES_SECTION` (default: `Session Notes`)
-- `CHATGPT_MCP_SESSION_GROUPS` JSON map of lowercase group names to folders  
-  Example: `{"vaporforge":"John Notes/App Dev/VaporForge","agency-ops":"John Notes/App Dev/Agency Ops"}`
+- `CHATGPT_MCP_SESSION_GROUPS` JSON map of lowercase group names to folders; defaults to `{}` (no groups preconfigured — set per deployment in `wrangler.jsonc` or as a Worker var)  
+  Example: `{"projects":"Projects","notes":"Notes"}`
 
 ## Required secrets
 

@@ -70,12 +70,7 @@ function getErrorStatus(error: unknown) {
   if (requestError.status) {
     return requestError.status;
   }
-  const message = error instanceof Error ? error.message : '';
-  const match = message.match(/\((\d{3})\):/);
-  if (!match) {
-    return undefined;
-  }
-  return Number(match[1]);
+  return undefined;
 }
 
 async function getTreeSha(octokit: Octokit, config: VaultConfig) {

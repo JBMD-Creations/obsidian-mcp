@@ -13,13 +13,10 @@ export type VaultConfig = {
 };
 
 const DEFAULT_FOOTER_SECTION = 'ChatGPT MCP Footer';
-const DEFAULT_SESSION_FOLDER_ROOT = 'John Notes/App Dev';
+const DEFAULT_SESSION_FOLDER_ROOT = 'Notes';
 const DEFAULT_SESSION_LOG_FOLDER = 'ChatGPT MCP/Session Logs';
 const DEFAULT_SESSION_NOTES_SECTION = 'Session Notes';
-const DEFAULT_SESSION_GROUPS: Record<string, string> = {
-  'agency-ops': 'John Notes/App Dev/Agency Ops',
-  vaporforge: 'John Notes/App Dev/VaporForge',
-};
+const DEFAULT_SESSION_GROUPS: Record<string, string> = {};
 
 function requireEnv(value: string | undefined, key: string) {
   if (!value || value.trim().length === 0) {
