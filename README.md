@@ -144,14 +144,14 @@ npm test
 
 After deploy, register the remote MCP endpoint in ChatGPT using:
 
-- MCP Server URL (preferred, SSE transport): `https://obsidian-mcp.<your-subdomain>.workers.dev/sse`
+- MCP Server URL (preferred, SSE transport): `https://obsidian-mcp.jbmd-creations.workers.dev/sse`
 - Authentication: OAuth
 
 ChatGPT's connector ("Apps") validates that `search` and `fetch` tools exist before it will operate; this server exposes both with the OpenAI-compatible schema.
 
 ## Claude and other streamable-HTTP clients
 
-- MCP Server URL: `https://obsidian-mcp.<your-subdomain>.workers.dev/mcp`
+- MCP Server URL: `https://obsidian-mcp.jbmd-creations.workers.dev/mcp`
 - Authentication: OAuth
 
 ## Security boundaries
