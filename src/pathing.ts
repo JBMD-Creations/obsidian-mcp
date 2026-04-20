@@ -16,17 +16,30 @@ export function normalizeNotePath(input: string) {
   return normalized;
 }
 
-export function assertAllowedMarkdownPath(input: string) {
-  const path = normalizeNotePath(input);
-  if (!MARKDOWN_EXTENSION.test(path)) {
-    throw new Error('Only Markdown notes are allowed.');
-  }
+function assertAllowedPathSegments(path: string) {
   if (DISALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix))) {
     throw new Error('That path is not allowed.');
   }
   if (path.split('/').some((segment) => segment.startsWith('.'))) {
     throw new Error('Hidden paths are not allowed.');
   }
+}
+
+export function assertAllowedFolderPath(input: string) {
+  const path = normalizeNotePath(input).replace(/\/+$/, '');
+  if (path.length === 0) {
+    throw new Error('Folder path is required.');
+  }
+  assertAllowedPathSegments(path);
+  return path;
+}
+
+export function assertAllowedMarkdownPath(input: string) {
+  const path = normalizeNotePath(input);
+  if (!MARKDOWN_EXTENSION.test(path)) {
+    throw new Error('Only Markdown notes are allowed.');
+  }
+  assertAllowedPathSegments(path);
   return path;
 }
 
@@ -56,7 +69,7 @@ export function buildCreatePath({
   folder: string;
   title: string;
 }) {
-  const normalizedFolder = normalizeNotePath(folder).replace(/\/+$/, '');
+  const normalizedFolder = assertAllowedFolderPath(folder);
   const slug = slugifyTitle(title);
 
   for (let index = 0; index < 1000; index += 1) {
@@ -68,4 +81,31 @@ export function buildCreatePath({
   }
 
   throw new Error('Could not generate a unique note path.');
+}
+
+export function buildSessionLogPath({ folder, group }: { folder: string; group: string }) {
+  const normalizedFolder = assertAllowedFolderPath(folder);
+  const slug = slugifyTitle(group);
+  return `${normalizedFolder}/${slug}-session-log.md`;
+}
+
+function encodePathSegments(value: string) {
+  return value.split('/').map((segment) => encodeURIComponent(segment)).join('/');
+}
+
+export function buildGithubBlobUrl({
+  branch,
+  owner,
+  path,
+  repo,
+}: {
+  branch: string;
+  owner: string;
+  path: string;
+  repo: string;
+}) {
+  const normalizedPath = assertAllowedMarkdownPath(path);
+  const encodedBranch = encodePathSegments(branch);
+  const encodedPath = encodePathSegments(normalizedPath);
+  return `https://github.com/${owner}/${repo}/blob/${encodedBranch}/${encodedPath}`;
 }

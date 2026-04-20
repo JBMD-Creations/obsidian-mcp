@@ -7,31 +7,68 @@ Remote MCP server for safe ChatGPT-driven note capture into the `Aventerica89/Ob
 - Search markdown notes in the vault repo.
 - Read a note by path.
 - Append structured blocks to existing notes, only under `## ChatGPT MCP`.
+- Append structured footer blocks to existing notes, only under `## ChatGPT MCP Footer`.
 - Create new notes only inside `ChatGPT MCP/`.
+- Start scoped project sessions (`start_session`) and capture quick notes (`note` / `end_session`) into one session-log note per group.
 - Auto-commit each write directly to the vault repo.
 
 This is intentionally not a general-purpose filesystem MCP.
 
 ## Tool surface
 
+- `search`
+  - ChatGPT connector compatibility tool. Takes `query`, returns `{ results: [{ id, title, url }] }`. `id` is a vault-relative markdown path suitable for `fetch`.
+- `fetch`
+  - ChatGPT connector compatibility tool. Takes the `id` returned by `search` and returns `{ id, title, text, url, metadata }` with the full note body.
 - `search_notes`
-  - Find likely markdown notes by title/path and return a short preview.
+  - Find likely markdown notes by title/path and return a short preview. Supports an optional `folder` scope; intended for Claude and other clients that can pass richer arguments.
 - `get_note`
   - Read an existing markdown note from the vault repo.
 - `append_to_note`
   - Append a structured block to an existing note, only under `## ChatGPT MCP`.
+- `append_footer_note`
+  - Append a structured block to any existing note, only under `## ChatGPT MCP Footer`.
 - `create_chatgpt_note`
   - Create a new reviewable note only inside `ChatGPT MCP/`.
 - `list_allowed_destinations`
-  - Return the current write constraints and target repo details.
+  - Return the current write constraints, session status, and target repo details.
+- `list_session_groups`
+  - List configured group → folder mappings for session commands.
+- `start_session`
+  - Start a durable active session for the authenticated user and return a `session_id`.
+- `note`
+  - Append a note to the durable active session log (supports `content` or `text`).
+- `end_session`
+  - Append a final summary and clear the durable active session context.
+
+## Session capture semantics
+
+- `start_session(group, folder_path?, title?)` starts a durable active session and returns `session_id`.
+- `note(content?, text?, related_notes?, session_id?)` appends to the active session log.
+- `end_session(summary?, related_notes?, session_id?)` appends a final summary and clears active session state.
+- `text` is accepted as an alias for `content`.
+- If `session_id` is omitted, the server uses the persisted active session for the authenticated user.
+- Active session state is persisted in KV (`OAUTH_KV`) and no longer depends on in-memory Worker state.
 
 ## Write semantics
 
 - Existing notes are never overwritten in place outside the reserved section.
 - If `## ChatGPT MCP` does not exist, it is created at the end of the note.
 - Every append block includes timestamp, `source: chatgpt-mcp`, `actor`, and `needs_review: true`.
+- Session captures append to `ChatGPT MCP/Session Logs/<group>-session-log.md`.
 - New notes are created only under `ChatGPT MCP/` with reviewable frontmatter.
 - Every successful write creates a direct commit in the vault repo.
+
+## Optional environment variables
+
+These are optional; defaults are applied when unset.
+
+- `CHATGPT_MCP_FOOTER_SECTION` (default: `ChatGPT MCP Footer`)
+- `CHATGPT_MCP_SESSION_FOLDER_ROOT` (default: `Notes`)
+- `CHATGPT_MCP_SESSION_LOG_FOLDER` (default: `ChatGPT MCP/Session Logs`)
+- `CHATGPT_MCP_SESSION_NOTES_SECTION` (default: `Session Notes`)
+- `CHATGPT_MCP_SESSION_GROUPS` JSON map of lowercase group names to folders; defaults to `{}` (no groups preconfigured — set per deployment in `wrangler.jsonc` or as a Worker var)  
+  Example: `{"projects":"Projects","notes":"Notes"}`
 
 ## Required secrets
 
@@ -107,13 +144,22 @@ npm test
 
 After deploy, register the remote MCP endpoint in ChatGPT using:
 
-- MCP Server URL: `https://obsidian-mcp.<your-subdomain>.workers.dev/mcp`
+- MCP Server URL (preferred, SSE transport): `https://obsidian-mcp.jbmd-creations.workers.dev/sse`
+- Authentication: OAuth
+
+ChatGPT's connector ("Apps") validates that `search` and `fetch` tools exist before it will operate; this server exposes both with the OpenAI-compatible schema.
+
+## Claude and other streamable-HTTP clients
+
+- MCP Server URL: `https://obsidian-mcp.jbmd-creations.workers.dev/mcp`
 - Authentication: OAuth
 
 ## Security boundaries
 
 - Only the GitHub username in `ALLOWED_GITHUB_USERNAME` can authorize.
 - Existing notes can only be appended under `## ChatGPT MCP`.
+- Footer appends can only be written under `## ChatGPT MCP Footer`.
 - New notes can only be created in `ChatGPT MCP/`.
 - No overwrite, rename, move, or delete tools are exposed.
 - Hidden paths, `.obsidian`, `.git`, path traversal, and non-Markdown targets are rejected.
+- `fetch(id)` revalidates `id` via `assertAllowedMarkdownPath`, so ChatGPT cannot craft an id that escapes the vault.
