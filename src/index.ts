@@ -14,7 +14,13 @@ import {
   listNotesInFolder,
   searchNotes,
 } from './github-vault';
-import { assertAllowedFolderPath, assertAllowedMarkdownPath, buildGithubBlobUrl, buildSessionLogPath } from './pathing';
+import {
+  assertAllowedCreateLocation,
+  assertAllowedFolderPath,
+  assertAllowedMarkdownPath,
+  buildGithubBlobUrl,
+  buildSessionLogPath,
+} from './pathing';
 import { clearActiveSession, getActiveSession, saveActiveSession, type ActiveSessionRecord } from './session-store';
 import { normalizeNoteContent, resolveSessionId } from './session-tools';
 import type { Props } from './utils';
@@ -423,25 +429,34 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
 
     this.server.tool(
       'create_chatgpt_note',
-      'Create a new reviewable note inside the ChatGPT MCP folder.',
+      'Create a new reviewable note. Defaults to the ChatGPT MCP folder; pass folder to target any project folder under the session root.',
       {
         title: z.string().min(1),
         body: z.string().min(1),
+        folder: z.string().min(1).optional(),
         related_notes: z.array(z.string()).optional().default([]),
         tags: z.array(z.string()).optional().default([]),
       },
-      async ({ body, related_notes, tags, title }) =>
-        asText(
+      async ({ body, folder, related_notes, tags, title }) => {
+        const targetFolder = folder
+          ? assertAllowedCreateLocation(folder, {
+              createFolder: config.createFolder,
+              sessionFolderRoot: config.sessionFolderRoot,
+            })
+          : undefined;
+        return asText(
           await createChatgptNote({
             body,
             config,
+            folder: targetFolder,
             login: this.props!.login,
             octokit,
             relatedNotes: related_notes,
             tags,
             title,
           }),
-        ),
+        );
+      },
     );
   }
 }

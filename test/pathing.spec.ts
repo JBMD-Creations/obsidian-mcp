@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assertAllowedCreateLocation,
   assertAllowedFolderPath,
   assertAllowedMarkdownPath,
   buildCreatePath,
@@ -47,6 +48,31 @@ describe('assertAllowedFolderPath', () => {
   it('rejects traversal and hidden folders', () => {
     expect(() => assertAllowedFolderPath('../etc')).toThrow();
     expect(() => assertAllowedFolderPath('.obsidian/plugins')).toThrow();
+  });
+});
+
+describe('assertAllowedCreateLocation', () => {
+  const opts = { createFolder: 'ChatGPT MCP', sessionFolderRoot: 'John Notes/App Dev' };
+
+  it('accepts the default create folder', () => {
+    expect(assertAllowedCreateLocation('ChatGPT MCP', opts)).toBe('ChatGPT MCP');
+  });
+
+  it('accepts the session root and any folder under it', () => {
+    expect(assertAllowedCreateLocation('John Notes/App Dev', opts)).toBe('John Notes/App Dev');
+    expect(assertAllowedCreateLocation('John Notes/App Dev/VaporForge', opts)).toBe('John Notes/App Dev/VaporForge');
+    expect(assertAllowedCreateLocation('John Notes/App Dev/Sub/Deep', opts)).toBe('John Notes/App Dev/Sub/Deep');
+  });
+
+  it('rejects folders outside the session root and create folder', () => {
+    expect(() => assertAllowedCreateLocation('Notes', opts)).toThrow();
+    expect(() => assertAllowedCreateLocation('John Notes', opts)).toThrow();
+    expect(() => assertAllowedCreateLocation('John Notes/App Dev2', opts)).toThrow();
+  });
+
+  it('rejects traversal and hidden folders', () => {
+    expect(() => assertAllowedCreateLocation('../etc', opts)).toThrow();
+    expect(() => assertAllowedCreateLocation('.obsidian/plugins', opts)).toThrow();
   });
 });
 

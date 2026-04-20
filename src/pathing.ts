@@ -58,6 +58,24 @@ export function toWikiLink(path: string) {
   return `[[${path.replace(/\.md$/i, '')}]]`;
 }
 
+export function assertAllowedCreateLocation(
+  input: string,
+  { createFolder, sessionFolderRoot }: { createFolder: string; sessionFolderRoot: string },
+) {
+  const folder = assertAllowedFolderPath(input);
+  const normalizedCreateFolder = assertAllowedFolderPath(createFolder);
+  const normalizedRoot = assertAllowedFolderPath(sessionFolderRoot);
+
+  if (folder === normalizedCreateFolder) {
+    return folder;
+  }
+  if (folder === normalizedRoot || folder.startsWith(`${normalizedRoot}/`)) {
+    return folder;
+  }
+
+  throw new Error(`Folder must be ${normalizedCreateFolder} or inside ${normalizedRoot}/.`);
+}
+
 export function buildCreatePath({
   date,
   existingPaths,

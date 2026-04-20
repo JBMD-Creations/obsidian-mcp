@@ -468,6 +468,7 @@ export async function appendToSessionLog({
 export async function createChatgptNote({
   body,
   config,
+  folder,
   login,
   octokit,
   relatedNotes,
@@ -476,6 +477,7 @@ export async function createChatgptNote({
 }: {
   body: string;
   config: VaultConfig;
+  folder?: string;
   login: string;
   octokit: Octokit;
   relatedNotes: string[];
@@ -486,7 +488,7 @@ export async function createChatgptNote({
   const path = buildCreatePath({
     date: new Date().toISOString().slice(0, 10),
     existingPaths,
-    folder: config.createFolder,
+    folder: folder ?? config.createFolder,
     title,
   });
 
