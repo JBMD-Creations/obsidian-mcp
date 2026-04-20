@@ -165,3 +165,6 @@ dist
 .env*
 !.env.example
 .wrangler/
+
+# Claude Code local settings (personal overrides)
+.claude/settings.local.json
