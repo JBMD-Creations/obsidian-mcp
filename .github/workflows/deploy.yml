@@ -2,6 +2,9 @@ name: deploy
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
@@ -14,9 +17,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -24,8 +27,22 @@ jobs:
       - run: npm ci
 
       - name: Deploy to Cloudflare Workers with Wrangler
-        uses: cloudflare/wrangler-action@v3.14.1
+        uses: cloudflare/wrangler-action@v3.15.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
+
+      - name: Smoke test deployed Worker
+        run: |
+          curl -fsS --retry 5 --retry-delay 2 --retry-connrefused \
+            https://obsidian-mcp.jbmd-creations.workers.dev/.well-known/oauth-authorization-server \
+            > /dev/null
+
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            --retry 5 --retry-delay 2 --retry-connrefused \
+            https://obsidian-mcp.jbmd-creations.workers.dev/mcp)
+          if [ "$code" != "401" ]; then
+            echo "::error::expected 401 from /mcp, got $code"
+            exit 1
+          fi
