@@ -86,11 +86,11 @@ Create a KV namespace and update `wrangler.jsonc`:
 wrangler kv namespace create "OAUTH_KV"
 ```
 
-Then copy the returned namespace id into [wrangler.jsonc](</Users/jb/repos/obsidian-mcp/wrangler.jsonc>).
+Then copy the returned namespace id into [wrangler.jsonc](./wrangler.jsonc).
 
 ## GitHub Actions deploy
 
-The repo includes [deploy.yml](/Users/jb/repos/obsidian-mcp/.github/workflows/deploy.yml), which deploys on pushes to `main` and on manual dispatch.
+The repo includes [deploy.yml](./.github/workflows/deploy.yml), which deploys on pushes to `main` and on manual dispatch.
 
 Set these GitHub repository secrets before enabling the workflow:
 
