@@ -32,3 +32,9 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
+
+      - name: Smoke test deployed Worker
+        run: |
+          curl -fsS --retry 5 --retry-delay 2 --retry-connrefused \
+            https://obsidian-mcp.jbmd-creations.workers.dev/.well-known/oauth-authorization-server \
+            > /dev/null
