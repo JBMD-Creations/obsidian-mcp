@@ -24,15 +24,15 @@ describe('assertAllowedMarkdownPath', () => {
 });
 
 describe('buildCreatePath', () => {
-  it('creates a unique note path in the ChatGPT MCP folder', () => {
+  it('creates a unique note path in the _Inbox folder', () => {
     const path = buildCreatePath({
       date: '2026-04-13',
-      existingPaths: new Set(['ChatGPT MCP/2026-04-13-new-note.md']),
-      folder: 'ChatGPT MCP',
+      existingPaths: new Set(['_Inbox/2026-04-13-new-note.md']),
+      folder: '_Inbox',
       title: 'New Note',
     });
 
-    expect(path).toBe('ChatGPT MCP/2026-04-13-new-note-2.md');
+    expect(path).toBe('_Inbox/2026-04-13-new-note-2.md');
   });
 
   it('slugifies titles predictably', () => {
@@ -52,10 +52,10 @@ describe('assertAllowedFolderPath', () => {
 });
 
 describe('assertAllowedCreateLocation', () => {
-  const opts = { createFolder: 'ChatGPT MCP', sessionFolderRoot: 'John Notes/App Dev' };
+  const opts = { createFolder: '_Inbox', sessionFolderRoot: 'John Notes/App Dev' };
 
   it('accepts the default create folder', () => {
-    expect(assertAllowedCreateLocation('ChatGPT MCP', opts)).toBe('ChatGPT MCP');
+    expect(assertAllowedCreateLocation('_Inbox', opts)).toBe('_Inbox');
   });
 
   it('accepts the session root and any folder under it', () => {
@@ -78,8 +78,8 @@ describe('assertAllowedCreateLocation', () => {
 
 describe('buildSessionLogPath', () => {
   it('builds a deterministic group log path', () => {
-    expect(buildSessionLogPath({ folder: 'ChatGPT MCP/Session Logs', group: 'VaporForge' })).toBe(
-      'ChatGPT MCP/Session Logs/vaporforge-session-log.md',
+    expect(buildSessionLogPath({ folder: '_Inbox/Session Logs', group: 'VaporForge' })).toBe(
+      '_Inbox/Session Logs/vaporforge-session-log.md',
     );
   });
 });

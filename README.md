@@ -8,7 +8,7 @@ Remote MCP server for safe ChatGPT-driven note capture into the `Aventerica89/Ob
 - Read a note by path.
 - Append structured blocks to existing notes, only under `## ChatGPT MCP`.
 - Append structured footer blocks to existing notes, only under `## ChatGPT MCP Footer`.
-- Create new notes inside `ChatGPT MCP/` (default) or any folder under the configured session root.
+- Create new notes inside `_Inbox/` (default) or any folder under the configured session root.
 - Start scoped project sessions (`start_session`) and capture quick notes (`note` / `end_session`) into one session-log note per group.
 - Auto-commit each write directly to the vault repo.
 
@@ -29,7 +29,7 @@ This is intentionally not a general-purpose filesystem MCP.
 - `append_footer_note`
   - Append a structured block to any existing note, only under `## ChatGPT MCP Footer`.
 - `create_chatgpt_note`
-  - Create a new reviewable note. Defaults to `ChatGPT MCP/`; pass an optional `folder` to target any folder under the configured session root.
+  - Create a new reviewable note. Defaults to `_Inbox/`; pass an optional `folder` to target any folder under the configured session root.
 - `list_allowed_destinations`
   - Return the current write constraints, session status, and target repo details.
 - `list_session_groups`
@@ -55,8 +55,8 @@ This is intentionally not a general-purpose filesystem MCP.
 - Existing notes are never overwritten in place outside the reserved section.
 - If `## ChatGPT MCP` does not exist, it is created at the end of the note.
 - Every append block includes timestamp, `source: chatgpt-mcp`, `actor`, and `needs_review: true`.
-- Session captures append to `ChatGPT MCP/Session Logs/<group>-session-log.md`.
-- New notes are created under `ChatGPT MCP/` by default, or under any folder inside the configured session root, with reviewable frontmatter.
+- Session captures append to `_Inbox/Session Logs/<group>-session-log.md`.
+- New notes are created under `_Inbox/` by default, or under any folder inside the configured session root, with reviewable frontmatter.
 - Every successful write creates a direct commit in the vault repo.
 
 ## Optional environment variables
@@ -65,7 +65,7 @@ These are optional; defaults are applied when unset.
 
 - `CHATGPT_MCP_FOOTER_SECTION` (default: `ChatGPT MCP Footer`)
 - `CHATGPT_MCP_SESSION_FOLDER_ROOT` (default: `Notes`)
-- `CHATGPT_MCP_SESSION_LOG_FOLDER` (default: `ChatGPT MCP/Session Logs`)
+- `CHATGPT_MCP_SESSION_LOG_FOLDER` (default: `_Inbox/Session Logs`)
 - `CHATGPT_MCP_SESSION_NOTES_SECTION` (default: `Session Notes`)
 - `CHATGPT_MCP_SESSION_GROUPS` JSON map of lowercase group names to folders; defaults to `{}` (no groups preconfigured — set per deployment in `wrangler.jsonc` or as a Worker var)  
   Example: `{"projects":"Projects","notes":"Notes"}`
@@ -159,7 +159,7 @@ ChatGPT's connector ("Apps") validates that `search` and `fetch` tools exist bef
 - Only the GitHub username in `ALLOWED_GITHUB_USERNAME` can authorize.
 - Existing notes can only be appended under `## ChatGPT MCP`.
 - Footer appends can only be written under `## ChatGPT MCP Footer`.
-- New notes can only be created in `ChatGPT MCP/` or inside the configured session root (`CHATGPT_MCP_SESSION_FOLDER_ROOT`); creation always uses a unique filename, so existing notes are never overwritten.
+- New notes can only be created in `_Inbox/` or inside the configured session root (`CHATGPT_MCP_SESSION_FOLDER_ROOT`); creation always uses a unique filename, so existing notes are never overwritten.
 - No overwrite, rename, move, or delete tools are exposed.
 - Hidden paths, `.obsidian`, `.git`, path traversal, and non-Markdown targets are rejected.
 - `fetch(id)` revalidates `id` via `assertAllowedMarkdownPath`, so ChatGPT cannot craft an id that escapes the vault.

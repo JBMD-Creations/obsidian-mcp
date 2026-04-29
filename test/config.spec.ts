@@ -4,12 +4,12 @@ import { getVaultConfig } from '../src/config';
 describe('getVaultConfig', () => {
   const baseEnv = {
     ALLOWED_GITHUB_USERNAME: 'Aventerica89',
-    CHATGPT_MCP_FOLDER: 'ChatGPT MCP',
+    CHATGPT_MCP_FOLDER: '_Inbox',
     CHATGPT_MCP_SECTION: 'ChatGPT MCP',
     VAULT_REPO_BRANCH: 'main',
     VAULT_REPO_NAME: 'Obsidian-Claude',
     VAULT_REPO_OWNER: 'Aventerica89',
-  } as Env;
+  } as unknown as Env;
 
   it('defaults session groups to an empty map when env is omitted', () => {
     const config = getVaultConfig(baseEnv);
@@ -23,7 +23,7 @@ describe('getVaultConfig', () => {
       CHATGPT_MCP_SESSION_GROUPS: JSON.stringify({
         clarity: 'John Notes/App Dev/Clarity',
       }),
-    } as Env);
+    } as unknown as Env);
 
     expect(config.sessionGroups).toEqual({
       clarity: 'John Notes/App Dev/Clarity',

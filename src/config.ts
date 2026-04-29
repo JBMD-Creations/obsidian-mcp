@@ -14,7 +14,7 @@ export type VaultConfig = {
 
 const DEFAULT_FOOTER_SECTION = 'ChatGPT MCP Footer';
 const DEFAULT_SESSION_FOLDER_ROOT = 'Notes';
-const DEFAULT_SESSION_LOG_FOLDER = 'ChatGPT MCP/Session Logs';
+const DEFAULT_SESSION_LOG_FOLDER = '_Inbox/Session Logs';
 const DEFAULT_SESSION_NOTES_SECTION = 'Session Notes';
 const DEFAULT_SESSION_GROUPS: Record<string, string> = {};
 

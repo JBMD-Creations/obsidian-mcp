@@ -429,7 +429,7 @@ export class ObsidianMCP extends McpAgent<Env, SessionState, Props> {
 
     this.server.tool(
       'create_chatgpt_note',
-      'Create a new reviewable note. Defaults to the ChatGPT MCP folder; pass folder to target any project folder under the session root.',
+      'Create a new reviewable note. Defaults to the _Inbox folder; pass folder to target any project folder under the session root.',
       {
         title: z.string().min(1),
         body: z.string().min(1),

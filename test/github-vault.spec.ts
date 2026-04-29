@@ -11,7 +11,7 @@ import {
 const config = {
   allowedGithubUsername: 'Aventerica89',
   appendSection: 'ChatGPT MCP',
-  createFolder: 'ChatGPT MCP',
+  createFolder: '_Inbox',
   footerSection: 'ChatGPT MCP Footer',
   repoBranch: 'main',
   repoName: 'Obsidian-Claude',
@@ -20,7 +20,7 @@ const config = {
   sessionGroups: {
     vaporforge: 'John Notes/App Dev/VaporForge',
   },
-  sessionLogFolder: 'ChatGPT MCP/Session Logs',
+  sessionLogFolder: '_Inbox/Session Logs',
   sessionNotesSection: 'Session Notes',
 };
 
@@ -70,9 +70,9 @@ describe('appendToSessionLog', () => {
       sessionEvent: 'note',
     });
 
-    expect(result.path).toBe('ChatGPT MCP/Session Logs/vaporforge-session-log.md');
+    expect(result.path).toBe('_Inbox/Session Logs/vaporforge-session-log.md');
     const commitCall = octokit.request.mock.calls[1];
-    expect(commitCall?.[1]?.path).toBe('ChatGPT MCP/Session Logs/vaporforge-session-log.md');
+    expect(commitCall?.[1]?.path).toBe('_Inbox/Session Logs/vaporforge-session-log.md');
     const committedMarkdown = Buffer.from(commitCall?.[1]?.content, 'base64').toString('utf8');
     expect(committedMarkdown).toContain('## Session Notes');
     expect(committedMarkdown).toContain('session_event: note');
@@ -81,7 +81,7 @@ describe('appendToSessionLog', () => {
   it('treats wrapped 404 errors as missing logs by reading attached status metadata', async () => {
     const octokit = createOctokitMock();
     const wrapped404 = new Error(
-      'Loading note ChatGPT MCP/Session Logs/vaporforge-session-log.md failed (404): Not Found',
+      'Loading note _Inbox/Session Logs/vaporforge-session-log.md failed (404): Not Found',
     ) as Error & { status?: number };
     wrapped404.status = 404;
     octokit.request.mockReset();
@@ -102,7 +102,7 @@ describe('appendToSessionLog', () => {
       sessionEvent: 'note',
     });
 
-    expect(result.path).toBe('ChatGPT MCP/Session Logs/vaporforge-session-log.md');
+    expect(result.path).toBe('_Inbox/Session Logs/vaporforge-session-log.md');
     expect(octokit.request).toHaveBeenCalledTimes(2);
   });
 });
