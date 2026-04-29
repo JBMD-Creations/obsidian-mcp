@@ -371,6 +371,7 @@ export async function appendToSessionLog({
   folder,
   group,
   login,
+  logPath,
   octokit,
   relatedNotes,
   sessionEvent,
@@ -380,19 +381,23 @@ export async function appendToSessionLog({
   folder: string;
   group: string;
   login: string;
+  logPath?: string;
   octokit: Octokit;
   relatedNotes: string[];
   sessionEvent: 'note' | 'end';
 }) {
   const normalizedFolder = assertAllowedFolderPath(folder);
-  const logPath = buildSessionLogPath({
-    folder: config.sessionLogFolder,
-    group,
-  });
+  const resolvedLogPath = logPath
+    ? assertAllowedMarkdownPath(logPath)
+    : buildSessionLogPath({
+        folder: config.sessionLogFolder,
+        group,
+      });
+  const normalizedLogPath = assertAllowedMarkdownPath(resolvedLogPath);
 
   let file = null as RepoFile | null;
   try {
-    file = await getFile(octokit, config, logPath);
+    file = await getFile(octokit, config, normalizedLogPath);
   } catch (error) {
     const status = getErrorStatus(error);
     if (status !== 404) {
@@ -433,14 +438,14 @@ export async function appendToSessionLog({
     await commitFile({
       config,
       content: nextContent,
-      message: `obsidian-mcp: create session log ${logPath}`,
+      message: `obsidian-mcp: create session log ${normalizedLogPath}`,
       octokit,
-      path: logPath,
+      path: normalizedLogPath,
     });
 
     return {
-      path: logPath,
-      title: extractTitle(nextContent, logPath),
+      path: normalizedLogPath,
+      title: extractTitle(nextContent, normalizedLogPath),
     };
   }
 
@@ -453,15 +458,15 @@ export async function appendToSessionLog({
   await commitFile({
     config,
     content: nextContent,
-    message: `obsidian-mcp: append session log ${logPath}`,
+    message: `obsidian-mcp: append session log ${normalizedLogPath}`,
     octokit,
-    path: logPath,
+    path: normalizedLogPath,
     sha: file.sha,
   });
 
   return {
-    path: logPath,
-    title: extractTitle(nextContent, logPath),
+    path: normalizedLogPath,
+    title: extractTitle(nextContent, normalizedLogPath),
   };
 }
 
