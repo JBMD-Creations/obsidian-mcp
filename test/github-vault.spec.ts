@@ -105,6 +105,38 @@ describe('appendToSessionLog', () => {
     expect(result.path).toBe('_Inbox/Session Logs/vaporforge-session-log.md');
     expect(octokit.request).toHaveBeenCalledTimes(2);
   });
+
+  it('uses the persisted session log path when one is provided', async () => {
+    const octokit = createOctokitMock();
+    octokit.request
+      .mockResolvedValueOnce({
+        data: {
+          content: Buffer.from('# VaporForge Session Log\n\n## Session Notes\n').toString('base64'),
+          sha: 'existing-sha',
+        },
+      })
+      .mockResolvedValueOnce({
+        data: { content: { sha: 'new-sha' } },
+      });
+
+    const result = await appendToSessionLog({
+      config,
+      content: 'Continue prior active session',
+      folder: 'John Notes/App Dev/VaporForge',
+      group: 'vaporforge',
+      logPath: 'ChatGPT MCP/Session Logs/vaporforge-session-log.md',
+      login: 'Aventerica89',
+      octokit: octokit as never,
+      relatedNotes: [],
+      sessionEvent: 'note',
+    });
+
+    expect(result.path).toBe('ChatGPT MCP/Session Logs/vaporforge-session-log.md');
+    const readCall = octokit.request.mock.calls[0];
+    const commitCall = octokit.request.mock.calls[1];
+    expect(readCall?.[1]?.path).toBe('ChatGPT MCP/Session Logs/vaporforge-session-log.md');
+    expect(commitCall?.[1]?.path).toBe('ChatGPT MCP/Session Logs/vaporforge-session-log.md');
+  });
 });
 
 describe('searchNotes', () => {
